@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -25,10 +24,11 @@ def load_data():
     return pd.read_csv("courses.csv")
 
 df = load_data()
+df.columns = df.columns.str.strip()  # Clean column names
 
 if "change_log" not in st.session_state:
     st.session_state.change_log = pd.DataFrame(columns=[
-        "Course Code", "Old Title", "New Title", "Old Attributes", "New Attributes",
+        "Course", "Old Title", "New Title", "Old Attributes", "New Attributes",
         "Comment", "Submitted By", "Timestamp", "Sent to ASO"
     ])
 
@@ -44,21 +44,22 @@ with tab1:
     if is_admin:
         st.subheader("Admin: Edit Course")
         with st.form("edit_form"):
-            selected = st.selectbox("Select Course to Edit", df["Course Code"])
-            course_row = df[df["Course Code"] == selected].iloc[0]
+            selected = st.selectbox("Select Course to Edit", df["Course"])
+            course_row = df[df["Course"] == selected].iloc[0]
 
-            new_title = st.text_input("New Title", course_row["Course Title"])
-            new_attrs = st.text_input("New Attributes", course_row["Attributes"])
+            new_title = st.text_input("New Title", course_row["Course"])
+            new_attrs = st.text_input("New Attributes", course_row["Attribute(s)"])
             comment = st.text_area("Comment on Change")
 
-            if st.form_submit_button("Submit Edit"):
-                idx = df[df["Course Code"] == selected].index[0]
+            submitted = st.form_submit_button("Submit Edit")
+            if submitted:
+                idx = df[df["Course"] == selected].index[0]
 
                 log_entry = {
-                    "Course Code": selected,
-                    "Old Title": df.at[idx, "Course Title"],
+                    "Course": selected,
+                    "Old Title": df.at[idx, "Course"],
                     "New Title": new_title,
-                    "Old Attributes": df.at[idx, "Attributes"],
+                    "Old Attributes": df.at[idx, "Attribute(s)"],
                     "New Attributes": new_attrs,
                     "Comment": comment,
                     "Submitted By": "Admin",
@@ -66,8 +67,8 @@ with tab1:
                     "Sent to ASO": False
                 }
 
-                df.at[idx, "Course Title"] = new_title
-                df.at[idx, "Attributes"] = new_attrs
+                df.at[idx, "Course"] = new_title
+                df.at[idx, "Attribute(s)"] = new_attrs
                 st.session_state.change_log = pd.concat([
                     st.session_state.change_log, pd.DataFrame([log_entry])
                 ], ignore_index=True)
@@ -76,14 +77,15 @@ with tab1:
     st.subheader("Advisor: Submit an Attribute Inquiry")
     with st.form("advisor_form"):
         advisor_name = st.text_input("Your Name")
-        advisor_course = st.selectbox("Course", df["Course Code"])
+        advisor_course = st.selectbox("Course", df["Course"])
         advisor_comment = st.text_area("Your question or comment")
-        if st.form_submit_button("Submit Inquiry"):
+        submitted_inquiry = st.form_submit_button("Submit Inquiry")
+        if submitted_inquiry:
             log_entry = {
-                "Course Code": advisor_course,
-                "Old Title": df[df["Course Code"] == advisor_course]["Course Title"].values[0],
+                "Course": advisor_course,
+                "Old Title": df[df["Course"] == advisor_course]["Course"].values[0],
                 "New Title": "-",
-                "Old Attributes": df[df["Course Code"] == advisor_course]["Attributes"].values[0],
+                "Old Attributes": df[df["Course"] == advisor_course]["Attribute(s)"].values[0],
                 "New Attributes": "-",
                 "Comment": advisor_comment,
                 "Submitted By": advisor_name,
@@ -114,3 +116,4 @@ with tab2:
         st.dataframe(df_log, use_container_width=True)
     else:
         st.info("No changes or inquiries logged yet.")
+
