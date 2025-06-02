@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
+import gspread
+from google.oauth2.service_account import Credentials
 from datetime import datetime
+import json
 
 st.set_page_config(page_title="Course Attribute Tracker", layout="wide")
 
@@ -18,19 +21,35 @@ with st.sidebar:
     elif password:
         st.error("Incorrect password")
 
-# --- LOAD DATA ---
-@st.cache_data
+# --- GOOGLE SHEETS SETUP ---
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+credentials = Credentials.from_service_account_info(
+    json.loads(st.secrets["GOOGLE_CREDENTIALS"]), scopes=scope
+)
+client = gspread.authorize(credentials)
+sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1o8GFr4Wih4QM17KrMzQ2LYsMNmjR1EHtMn4Zvm_s3S8/edit")
+data_ws = sheet.worksheet("Courses")
+log_ws = sheet.worksheet("Log")
+
 def load_data():
-    return pd.read_csv("courses.csv")
+    df = pd.DataFrame(data_ws.get_all_records())
+    df.columns = df.columns.str.strip()
+    return df
+
+def load_log():
+    log_df = pd.DataFrame(log_ws.get_all_records())
+    log_df.columns = log_df.columns.str.strip()
+    return log_df
+
+def save_log(log_df):
+    log_ws.clear()
+    log_ws.update([log_df.columns.values.tolist()] + log_df.values.tolist())
 
 df = load_data()
-df.columns = df.columns.str.strip()  # Clean column names
-
-if "change_log" not in st.session_state:
-    st.session_state.change_log = pd.DataFrame(columns=[
-        "Course", "Old Title", "New Title", "Old Attributes", "New Attributes",
-        "Comment", "Submitted By", "Timestamp", "Sent to ASO"
-    ])
+log_df = load_log() if not log_ws.get_all_values() == [] else pd.DataFrame(columns=[
+    "Course", "Old Title", "New Title", "Old Attributes", "New Attributes",
+    "Comment", "Submitted By", "Timestamp", "Sent to ASO"
+])
 
 # --- TABS ---
 tab1, tab2 = st.tabs(["📄 Course Table", "🕓 Change Log"])
@@ -69,9 +88,10 @@ with tab1:
 
                 df.at[idx, "Course"] = new_title
                 df.at[idx, "Attribute(s)"] = new_attrs
-                st.session_state.change_log = pd.concat([
-                    st.session_state.change_log, pd.DataFrame([log_entry])
-                ], ignore_index=True)
+                data_ws.update([df.columns.values.tolist()] + df.values.tolist())
+
+                log_df = pd.concat([log_df, pd.DataFrame([log_entry])], ignore_index=True)
+                save_log(log_df)
                 st.success("Edit submitted and logged.")
 
     st.subheader("Advisor: Submit an Attribute Inquiry")
@@ -92,28 +112,25 @@ with tab1:
                 "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "Sent to ASO": False
             }
-            st.session_state.change_log = pd.concat([
-                st.session_state.change_log, pd.DataFrame([log_entry])
-            ], ignore_index=True)
+            log_df = pd.concat([log_df, pd.DataFrame([log_entry])], ignore_index=True)
+            save_log(log_df)
             st.success("Inquiry submitted.")
 
 # --- TAB 2: CHANGE LOG ---
 with tab2:
     st.header("Change & Inquiry Log")
-    if not st.session_state.change_log.empty:
-        df_log = st.session_state.change_log.copy()
-        for i in df_log.index:
+    if not log_df.empty:
+        for i in log_df.index:
             col1, col2 = st.columns([4, 2])
             with col1:
-                df_log.at[i, "Comment"] = st.text_input("Comment", value=df_log.at[i, "Comment"], key=f"log_comment_{i}")
+                log_df.at[i, "Comment"] = st.text_input("Comment", value=log_df.at[i, "Comment"], key=f"log_comment_{i}")
             with col2:
-                df_log.at[i, "Sent to ASO"] = st.checkbox("Sent to ASO?", value=df_log.at[i, "Sent to ASO"], key=f"log_check_{i}")
+                log_df.at[i, "Sent to ASO"] = st.checkbox("Sent to ASO?", value=log_df.at[i, "Sent to ASO"], key=f"log_check_{i}")
 
         if is_admin and st.button("Save Log Changes"):
-            st.session_state.change_log = df_log
+            save_log(log_df)
             st.success("Changes saved.")
 
-        st.dataframe(df_log, use_container_width=True)
+        st.dataframe(log_df, use_container_width=True)
     else:
         st.info("No changes or inquiries logged yet.")
-
