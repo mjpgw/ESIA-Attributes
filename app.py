@@ -38,7 +38,7 @@ def load_data():
 
 def load_log():
     log_df = pd.DataFrame(log_ws.get_all_records())
-    log_df.columns = log_df.columns.str.strip()
+    log_df.columns = [str(col).strip() for col in log_df.columns]
     return log_df
 
 def save_log(log_df):
