@@ -27,7 +27,7 @@ credentials = Credentials.from_service_account_info(
     st.secrets["GOOGLE_CREDENTIALS"], scopes=scope
 )
 client = gspread.authorize(credentials)
-sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1o8GFr4Wih4QM17KrMzQ2LYsMNmjR1EHtMn4Zvm_s3S8/edit")
+sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1o8GFr4Wih4QM17KrMzQ2LYsMNmjR1EHtMn4Zvm_s3S8")
 data_ws = sheet.worksheet("Courses")
 log_ws = sheet.worksheet("Log")
 
