@@ -25,7 +25,7 @@ with st.sidebar:
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 credentials = Credentials.from_service_account_info(
     st.secrets["GOOGLE_CREDENTIALS"], scopes=scope
-
+)
 client = gspread.authorize(credentials)
 sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1o8GFr4Wih4QM17KrMzQ2LYsMNmjR1EHtMn4Zvm_s3S8/edit")
 data_ws = sheet.worksheet("Courses")
