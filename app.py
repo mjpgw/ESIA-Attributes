@@ -52,6 +52,10 @@ inquiry_log_df = load_log(inquiry_log_ws) if inquiry_log_ws.get_all_values() els
     "Name", "Comment", "Addressed?", "Timestamp"
 ])
 
+# Ensure proper boolean conversion
+change_log_df["Sent to ASO"] = change_log_df["Sent to ASO"].apply(lambda x: str(x).strip().upper() == "TRUE")
+inquiry_log_df["Addressed?"] = inquiry_log_df["Addressed?"].apply(lambda x: str(x).strip().upper() == "TRUE")
+
 # --- TABS ---
 tab1, tab2, tab3 = st.tabs(["📄 Course Table", "📝 Change Log", "❓ Inquiry Log"])
 
@@ -91,8 +95,7 @@ with tab1:
                 courses_df.at[idx, "Attribute(s)"] = new_attrs
                 change_log_df = pd.concat([change_log_df, pd.DataFrame([log_entry])], ignore_index=True)
 
-                change_log_df["Sent to ASO"] = change_log_df["Sent to ASO"].astype(bool)
-                change_log_df.fillna({"Sent to ASO": False}, inplace=True)
+                change_log_df["Sent to ASO"] = change_log_df["Sent to ASO"].apply(lambda x: str(x).strip().upper() == "TRUE")
 
                 courses_ws.update([courses_df.columns.values.tolist()] + courses_df.values.tolist())
                 change_log_ws.update([change_log_df.columns.values.tolist()] + change_log_df.astype(str).values.tolist())
@@ -111,10 +114,7 @@ with tab1:
                 "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
             inquiry_log_df = pd.concat([inquiry_log_df, pd.DataFrame([log_entry])], ignore_index=True)
-
-            inquiry_log_df["Addressed?"] = inquiry_log_df["Addressed?"].astype(bool)
-            inquiry_log_df.fillna({"Addressed?": False}, inplace=True)
-
+            inquiry_log_df["Addressed?"] = inquiry_log_df["Addressed?"].apply(lambda x: str(x).strip().upper() == "TRUE")
             inquiry_log_ws.update([inquiry_log_df.columns.tolist()] + inquiry_log_df.astype(str).values.tolist())
             st.success("Inquiry submitted.")
 
@@ -124,7 +124,7 @@ with tab2:
     if not change_log_df.empty:
         editable_df = change_log_df.copy()
         editable_df["Comment"] = editable_df["Comment"].astype(str)
-        editable_df["Sent to ASO"] = editable_df["Sent to ASO"].astype(bool)
+        editable_df["Sent to ASO"] = editable_df["Sent to ASO"].apply(lambda x: str(x).strip().upper() == "TRUE")
 
         edited_df = st.data_editor(
             editable_df,
@@ -150,7 +150,7 @@ with tab3:
     if not filtered_df.empty:
         editable_df = filtered_df.copy()
         editable_df["Comment"] = editable_df["Comment"].astype(str)
-        editable_df["Addressed?"] = editable_df["Addressed?"].astype(bool)
+        editable_df["Addressed?"] = editable_df["Addressed?"].apply(lambda x: str(x).strip().upper() == "TRUE")
 
         edited_df = st.data_editor(
             editable_df,
@@ -170,4 +170,3 @@ with tab3:
             st.success("Inquiry log saved.")
     else:
         st.info("No inquiries submitted yet.")
-
