@@ -30,6 +30,7 @@ sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1o8GFr4Wih4QM
 courses_ws = sheet.worksheet("Courses")
 change_log_ws = sheet.worksheet("Log")
 inquiry_log_ws = sheet.worksheet("Inquiries")
+attribute_guide_ws = sheet.worksheet("Attribute Guide")
 
 # --- DATA CACHING ---
 @st.cache_data(ttl=60)
@@ -41,6 +42,11 @@ def load_courses():
 def load_log(ws):
     df = pd.DataFrame(ws.get_all_records())
     df.columns = [str(col).strip() for col in df.columns]
+    return df
+
+def load_attribute_guide():
+    df = pd.DataFrame(attribute_guide_ws.get_all_records())
+    df.columns = df.columns.str.strip()
     return df
 
 if "courses_df" not in st.session_state:
@@ -63,8 +69,8 @@ if "inquiry_log_df" not in st.session_state:
             "Name", "Comment", "Action", "Timestamp"
         ])
 
-# --- LOAD ATTRIBUTE GUIDE ---
-attribute_guide_df = pd.read_csv("Attribute Guide - Sheet1.csv")
+if "attribute_guide_df" not in st.session_state:
+    st.session_state.attribute_guide_df = load_attribute_guide()
 
 # --- TABS ---
 tab1, tab2, tab3, tab4 = st.tabs(["📄 Course Table", "📝 Change Log", "❓ Inquiry Log", "📘 Attribute Guide"])
@@ -174,5 +180,5 @@ with tab3:
 # --- TAB 4: ATTRIBUTE GUIDE ---
 with tab4:
     st.header("Attribute Guide")
-    st.dataframe(attribute_guide_df, use_container_width=True)
+    st.dataframe(st.session_state.attribute_guide_df, use_container_width=True)
 
