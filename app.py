@@ -49,8 +49,7 @@ change_log_df = load_log(change_log_ws) if change_log_ws.get_all_values() else p
     "Comment", "Submitted By", "Timestamp", "Sent to ASO"
 ])
 inquiry_log_df = load_log(inquiry_log_ws) if inquiry_log_ws.get_all_values() else pd.DataFrame(columns=[
-    "Course", "Old Title", "New Title", "Old Attributes", "New Attributes",
-    "Comment", "Submitted By", "Timestamp", "Sent to ASO"
+    "Name", "Comment", "Addressed?", "Timestamp"
 ])
 
 # --- TABS ---
@@ -80,7 +79,7 @@ with tab1:
                     "Course": selected,
                     "Old Title": courses_df.at[idx, "Course"],
                     "New Title": new_title,
-                    "Old Attributes": courses_df.at[idx, "Attribute(s)"],
+                    "Old Attributes": courses_df.at[idx, "Attribute(s)"] ,
                     "New Attributes": new_attrs,
                     "Comment": comment,
                     "Submitted By": "Admin",
@@ -98,20 +97,14 @@ with tab1:
     st.subheader("Advisor: Submit an Attribute Inquiry")
     with st.form("advisor_form"):
         advisor_name = st.text_input("Your Name")
-        advisor_course = st.selectbox("Course", courses_df["Course"])
         advisor_comment = st.text_area("Your question or comment")
         submitted_inquiry = st.form_submit_button("Submit Inquiry")
         if submitted_inquiry:
             log_entry = {
-                "Course": advisor_course,
-                "Old Title": courses_df[courses_df["Course"] == advisor_course]["Course"].values[0],
-                "New Title": "-",
-                "Old Attributes": courses_df[courses_df["Course"] == advisor_course]["Attribute(s)"].values[0],
-                "New Attributes": "-",
+                "Name": advisor_name,
                 "Comment": advisor_comment,
-                "Submitted By": advisor_name,
-                "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "Sent to ASO": False
+                "Addressed?": False,
+                "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
             inquiry_log_df = pd.concat([inquiry_log_df, pd.DataFrame([log_entry])], ignore_index=True)
             inquiry_log_ws.update([inquiry_log_df.columns.values.tolist()] + inquiry_log_df.values.tolist())
@@ -142,10 +135,14 @@ with tab2:
 # --- TAB 3: INQUIRY LOG ---
 with tab3:
     st.header("Inquiry Log")
-    if not inquiry_log_df.empty:
-        editable_df = inquiry_log_df.copy()
+
+    filter_unaddressed = st.checkbox("Show only unaddressed inquiries")
+    filtered_df = inquiry_log_df[~inquiry_log_df["Addressed?"]] if filter_unaddressed else inquiry_log_df
+
+    if not filtered_df.empty:
+        editable_df = filtered_df.copy()
         editable_df["Comment"] = editable_df["Comment"].astype(str)
-        editable_df["Sent to ASO"] = editable_df["Sent to ASO"].astype(bool)
+        editable_df["Addressed?"] = editable_df["Addressed?"].astype(bool)
 
         edited_df = st.data_editor(
             editable_df,
@@ -155,9 +152,14 @@ with tab3:
         )
 
         if is_admin and st.button("Save Inquiry Log"):
-            inquiry_log_df = edited_df
+            # Merge updates back into the main inquiry_log_df
+            for idx, row in edited_df.iterrows():
+                original_idx = inquiry_log_df[inquiry_log_df["Timestamp"] == row["Timestamp"]].index
+                if not original_idx.empty:
+                    inquiry_log_df.loc[original_idx[0], "Addressed?"] = row["Addressed?"]
+                    inquiry_log_df.loc[original_idx[0], "Comment"] = row["Comment"]
+
             inquiry_log_ws.update([inquiry_log_df.columns.values.tolist()] + inquiry_log_df.values.tolist())
             st.success("Inquiry log saved.")
     else:
         st.info("No inquiries submitted yet.")
-
