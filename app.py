@@ -28,7 +28,8 @@ credentials = Credentials.from_service_account_info(
 client = gspread.authorize(credentials)
 sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1o8GFr4Wih4QM17KrMzQ2LYsMNmjR1EHtMn4Zvm_s3S8")
 courses_ws = sheet.worksheet("Courses")
-log_ws = sheet.worksheet("Log")
+change_log_ws = sheet.worksheet("Change Log")
+inquiry_log_ws = sheet.worksheet("Inquiry Log")
 
 # --- LOAD DATA FUNCTIONS ---
 @st.cache_data
@@ -37,19 +38,23 @@ def load_courses():
     df.columns = df.columns.str.strip()
     return df
 
-def load_log():
-    df = pd.DataFrame(log_ws.get_all_records())
+def load_log(ws):
+    df = pd.DataFrame(ws.get_all_records())
     df.columns = [str(col).strip() for col in df.columns]
     return df
 
 courses_df = load_courses()
-log_df = load_log() if log_ws.get_all_values() else pd.DataFrame(columns=[
+change_log_df = load_log(change_log_ws) if change_log_ws.get_all_values() else pd.DataFrame(columns=[
+    "Course", "Old Title", "New Title", "Old Attributes", "New Attributes",
+    "Comment", "Submitted By", "Timestamp", "Sent to ASO"
+])
+inquiry_log_df = load_log(inquiry_log_ws) if inquiry_log_ws.get_all_values() else pd.DataFrame(columns=[
     "Course", "Old Title", "New Title", "Old Attributes", "New Attributes",
     "Comment", "Submitted By", "Timestamp", "Sent to ASO"
 ])
 
 # --- TABS ---
-tab1, tab2 = st.tabs(["📄 Course Table", "🕓 Change Log"])
+tab1, tab2, tab3 = st.tabs(["📄 Course Table", "📝 Change Log", "❓ Inquiry Log"])
 
 # --- TAB 1: COURSE TABLE ---
 with tab1:
@@ -85,9 +90,9 @@ with tab1:
 
                 courses_df.at[idx, "Course"] = new_title
                 courses_df.at[idx, "Attribute(s)"] = new_attrs
-                log_df = pd.concat([log_df, pd.DataFrame([log_entry])], ignore_index=True)
+                change_log_df = pd.concat([change_log_df, pd.DataFrame([log_entry])], ignore_index=True)
                 courses_ws.update([courses_df.columns.values.tolist()] + courses_df.values.tolist())
-                log_ws.update([log_df.columns.values.tolist()] + log_df.values.tolist())
+                change_log_ws.update([change_log_df.columns.values.tolist()] + change_log_df.values.tolist())
                 st.success("Edit submitted and logged.")
 
     st.subheader("Advisor: Submit an Attribute Inquiry")
@@ -108,15 +113,15 @@ with tab1:
                 "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "Sent to ASO": False
             }
-            log_df = pd.concat([log_df, pd.DataFrame([log_entry])], ignore_index=True)
-            log_ws.update([log_df.columns.values.tolist()] + log_df.values.tolist())
+            inquiry_log_df = pd.concat([inquiry_log_df, pd.DataFrame([log_entry])], ignore_index=True)
+            inquiry_log_ws.update([inquiry_log_df.columns.values.tolist()] + inquiry_log_df.values.tolist())
             st.success("Inquiry submitted.")
 
 # --- TAB 2: CHANGE LOG ---
 with tab2:
-    st.header("Change & Inquiry Log")
-    if not log_df.empty:
-        editable_df = log_df.copy()
+    st.header("Change Log")
+    if not change_log_df.empty:
+        editable_df = change_log_df.copy()
         editable_df["Comment"] = editable_df["Comment"].astype(str)
         editable_df["Sent to ASO"] = editable_df["Sent to ASO"].astype(bool)
 
@@ -127,10 +132,32 @@ with tab2:
             disabled=([] if is_admin else list(editable_df.columns))
         )
 
-        if is_admin and st.button("Save Log Changes"):
-            log_df = edited_df
-            log_ws.update([log_df.columns.values.tolist()] + log_df.values.tolist())
-            st.success("Changes saved.")
+        if is_admin and st.button("Save Change Log"):
+            change_log_df = edited_df
+            change_log_ws.update([change_log_df.columns.values.tolist()] + change_log_df.values.tolist())
+            st.success("Change log saved.")
     else:
-        st.info("No changes or inquiries logged yet.")
+        st.info("No change logs recorded yet.")
+
+# --- TAB 3: INQUIRY LOG ---
+with tab3:
+    st.header("Inquiry Log")
+    if not inquiry_log_df.empty:
+        editable_df = inquiry_log_df.copy()
+        editable_df["Comment"] = editable_df["Comment"].astype(str)
+        editable_df["Sent to ASO"] = editable_df["Sent to ASO"].astype(bool)
+
+        edited_df = st.data_editor(
+            editable_df,
+            use_container_width=True,
+            num_rows="dynamic",
+            disabled=([] if is_admin else list(editable_df.columns))
+        )
+
+        if is_admin and st.button("Save Inquiry Log"):
+            inquiry_log_df = edited_df
+            inquiry_log_ws.update([inquiry_log_df.columns.values.tolist()] + inquiry_log_df.values.tolist())
+            st.success("Inquiry log saved.")
+    else:
+        st.info("No inquiries submitted yet.")
 
