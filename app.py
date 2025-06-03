@@ -63,7 +63,7 @@ if "inquiry_log_df" not in st.session_state:
             "Name", "Comment", "Addressed?", "Timestamp"
         ])
 
-# --- SANITIZE CHECKBOX COLUMNS ---
+# --- Ensure checkbox columns are boolean ---
 for df_key, col in [("change_log_df", "Sent to ASO"), ("inquiry_log_df", "Addressed?")]:
     if col in st.session_state[df_key].columns:
         st.session_state[df_key][col] = st.session_state[df_key][col].astype(bool).fillna(False)
@@ -124,13 +124,19 @@ with tab1:
 # --- TAB 2: CHANGE LOG ---
 with tab2:
     st.header("Change Log")
-    df = st.session_state.change_log_df.copy()
-    for i in df.index:
-        df.at[i, "Sent to ASO"] = st.checkbox("Sent to ASO", value=df.at[i, "Sent to ASO"], key=f"aso_{i}")
+    editable_df = st.session_state.change_log_df.copy()
+    editable_df["Sent to ASO"] = editable_df["Sent to ASO"].astype(bool)
+
+    edited_df = st.data_editor(
+        editable_df,
+        use_container_width=True,
+        disabled=([] if is_admin else list(editable_df.columns)),
+        num_rows="dynamic"
+    )
+
     if is_admin and st.button("Save Change Log"):
-        for i in df.index:
-            st.session_state.change_log_df.at[i, "Sent to ASO"] = st.session_state.get(f"aso_{i}", False)
-        change_log_ws.update([st.session_state.change_log_df.columns.tolist()] + st.session_state.change_log_df.astype(str).values.tolist())
+        st.session_state.change_log_df = edited_df
+        change_log_ws.update([edited_df.columns.tolist()] + edited_df.astype(str).values.tolist())
         courses_ws.update([st.session_state.courses_df.columns.tolist()] + st.session_state.courses_df.values.tolist())
         st.success("Change log saved.")
 
@@ -141,11 +147,22 @@ with tab3:
     df = st.session_state.inquiry_log_df.copy()
     if filter_unaddressed:
         df = df[df["Addressed?"] == False]
-    for i in df.index:
-        df.at[i, "Addressed?"] = st.checkbox("Addressed?", value=df.at[i, "Addressed?"], key=f"inq_{i}")
+
+    editable_df = df.copy()
+    editable_df["Addressed?"] = editable_df["Addressed?"].astype(bool)
+
+    edited_df = st.data_editor(
+        editable_df,
+        use_container_width=True,
+        disabled=([] if is_admin else list(editable_df.columns)),
+        num_rows="dynamic"
+    )
+
     if is_admin and st.button("Save Inquiry Log"):
-        for i in df.index:
-            st.session_state.inquiry_log_df.at[i, "Addressed?"] = st.session_state.get(f"inq_{i}", False)
+        for idx, row in edited_df.iterrows():
+            orig_idx = st.session_state.inquiry_log_df["Timestamp"] == row["Timestamp"]
+            st.session_state.inquiry_log_df.loc[orig_idx, "Addressed?"] = row["Addressed?"]
+            st.session_state.inquiry_log_df.loc[orig_idx, "Comment"] = row["Comment"]
+
         inquiry_log_ws.update([st.session_state.inquiry_log_df.columns.tolist()] + st.session_state.inquiry_log_df.astype(str).values.tolist())
         st.success("Inquiry log saved.")
-
