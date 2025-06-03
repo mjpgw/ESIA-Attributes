@@ -52,7 +52,7 @@ if "change_log_df" not in st.session_state:
     else:
         st.session_state.change_log_df = pd.DataFrame(columns=[
             "Course", "Old Title", "New Title", "Old Attributes", "New Attributes",
-            "Comment", "Submitted By", "Timestamp", "Sent to ASO"
+            "Comment", "Submitted By", "Timestamp", "Action"
         ])
 
 if "inquiry_log_df" not in st.session_state:
@@ -60,7 +60,7 @@ if "inquiry_log_df" not in st.session_state:
         st.session_state.inquiry_log_df = load_log(inquiry_log_ws)
     else:
         st.session_state.inquiry_log_df = pd.DataFrame(columns=[
-            "Name", "Comment", "Addressed?", "Timestamp"
+            "Name", "Comment", "Action", "Timestamp"
         ])
 
 # --- TABS ---
@@ -70,19 +70,20 @@ tab1, tab2, tab3 = st.tabs(["📄 Course Table", "📝 Change Log", "❓ Inquiry
 with tab1:
     st.header("Course List")
     editable_courses_df = st.session_state.courses_df.copy()
-    if is_admin:
-        editable_courses_df["Comment"] = editable_courses_df.get("Comment", "")
-        editable_courses_df = st.data_editor(
-            editable_courses_df,
-            use_container_width=True,
-            num_rows="dynamic"
-        )
-        if st.button("Save Course Comments"):
-            st.session_state.courses_df = editable_courses_df
-            courses_ws.update([editable_courses_df.columns.tolist()] + editable_courses_df.values.tolist())
-            st.success("Courses updated.")
-    else:
-        st.dataframe(editable_courses_df, use_container_width=True)
+    if "Comment" not in editable_courses_df.columns:
+        editable_courses_df["Comment"] = ""
+
+    edited_courses = st.data_editor(
+        editable_courses_df,
+        use_container_width=True,
+        disabled=([] if is_admin else list(editable_courses_df.columns)),
+        num_rows="dynamic"
+    )
+
+    if is_admin and st.button("Save Course Comments"):
+        st.session_state.courses_df = edited_courses
+        courses_ws.update([st.session_state.courses_df.columns.tolist()] + st.session_state.courses_df.values.tolist())
+        st.success("Course comments saved.")
 
     st.markdown("---")
     if is_admin:
@@ -107,13 +108,11 @@ with tab1:
                     "Comment": comment,
                     "Submitted By": "Admin",
                     "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "Sent to ASO": False
+                    "Action": ""
                 }
                 st.session_state.courses_df.at[idx, "Course"] = new_title
                 st.session_state.courses_df.at[idx, "Attribute(s)"] = new_attrs
                 st.session_state.change_log_df = pd.concat([st.session_state.change_log_df, pd.DataFrame([log_entry])], ignore_index=True)
-                courses_ws.update([st.session_state.courses_df.columns.tolist()] + st.session_state.courses_df.values.tolist())
-                change_log_ws.update([st.session_state.change_log_df.columns.tolist()] + st.session_state.change_log_df.astype(str).values.tolist())
                 st.success("Edit submitted and logged.")
 
     st.subheader("Advisor: Submit an Attribute Inquiry")
@@ -125,17 +124,27 @@ with tab1:
             log_entry = {
                 "Name": advisor_name,
                 "Comment": advisor_comment,
-                "Addressed?": False,
+                "Action": "",
                 "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
             st.session_state.inquiry_log_df = pd.concat([st.session_state.inquiry_log_df, pd.DataFrame([log_entry])], ignore_index=True)
-            inquiry_log_ws.update([st.session_state.inquiry_log_df.columns.tolist()] + st.session_state.inquiry_log_df.astype(str).values.tolist())
             st.success("Inquiry submitted.")
 
 # --- TAB 2: CHANGE LOG ---
 with tab2:
     st.header("Change Log")
-    st.dataframe(st.session_state.change_log_df, use_container_width=True)
+    editable_log = st.session_state.change_log_df.copy()
+    edited_log = st.data_editor(
+        editable_log,
+        use_container_width=True,
+        disabled=([] if is_admin else list(editable_log.columns)),
+        num_rows="dynamic"
+    )
+    if is_admin and st.button("Save Change Log"):
+        st.session_state.change_log_df = edited_log
+        change_log_ws.update([edited_log.columns.tolist()] + edited_log.astype(str).values.tolist())
+        courses_ws.update([st.session_state.courses_df.columns.tolist()] + st.session_state.courses_df.values.tolist())
+        st.success("Change log saved.")
 
 # --- TAB 3: INQUIRY LOG ---
 with tab3:
@@ -143,7 +152,20 @@ with tab3:
     filter_unaddressed = st.checkbox("Show only unaddressed inquiries")
     df = st.session_state.inquiry_log_df.copy()
     if filter_unaddressed:
-        df = df[df["Addressed?"] == False]
-    st.dataframe(df, use_container_width=True)
+        df = df[df["Action"].str.strip() == ""]
+
+    edited_inquiries = st.data_editor(
+        df,
+        use_container_width=True,
+        disabled=([] if is_admin else list(df.columns)),
+        num_rows="dynamic"
+    )
+
+    if is_admin and st.button("Save Inquiry Log"):
+        st.session_state.inquiry_log_df = pd.concat(
+            [edited_inquiries[df.columns]], ignore_index=True
+        )
+        inquiry_log_ws.update([st.session_state.inquiry_log_df.columns.tolist()] + st.session_state.inquiry_log_df.astype(str).values.tolist())
+        st.success("Inquiry log saved.")
 
 
