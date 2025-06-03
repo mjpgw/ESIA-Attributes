@@ -112,6 +112,7 @@ with tab1:
                 st.session_state.courses_df.at[idx, "Course"] = new_title
                 st.session_state.courses_df.at[idx, "Attribute(s)"] = new_attrs
                 st.session_state.change_log_df = pd.concat([st.session_state.change_log_df, pd.DataFrame([log_entry])], ignore_index=True)
+                courses_ws.update([st.session_state.courses_df.columns.tolist()] + st.session_state.courses_df.values.tolist())
                 st.success("Edit submitted and logged.")
 
     st.subheader("Advisor: Submit an Attribute Inquiry")
@@ -127,6 +128,7 @@ with tab1:
                 "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
             st.session_state.inquiry_log_df = pd.concat([st.session_state.inquiry_log_df, pd.DataFrame([log_entry])], ignore_index=True)
+            inquiry_log_ws.update([st.session_state.inquiry_log_df.columns.tolist()] + st.session_state.inquiry_log_df.astype(str).values.tolist())
             st.success("Inquiry submitted.")
 
 # --- TAB 2: CHANGE LOG ---
@@ -142,7 +144,6 @@ with tab2:
     if is_admin and st.button("Save Change Log"):
         st.session_state.change_log_df = edited_log
         change_log_ws.update([edited_log.columns.tolist()] + edited_log.astype(str).values.tolist())
-        courses_ws.update([st.session_state.courses_df.columns.tolist()] + st.session_state.courses_df.values.tolist())
         st.success("Change log saved.")
 
 # --- TAB 3: INQUIRY LOG ---
@@ -166,3 +167,4 @@ with tab3:
         )
         inquiry_log_ws.update([st.session_state.inquiry_log_df.columns.tolist()] + st.session_state.inquiry_log_df.astype(str).values.tolist())
         st.success("Inquiry log saved.")
+
