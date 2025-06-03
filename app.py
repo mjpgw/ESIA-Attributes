@@ -73,31 +73,30 @@ with tab1:
 
             submitted = st.form_submit_button("Submit Edit")
             if submitted:
-    idx = courses_df[courses_df["Course"] == selected].index[0]
+                idx = courses_df[courses_df["Course"] == selected].index[0]
 
-    log_entry = {
-        "Course": selected,
-        "Old Title": courses_df.at[idx, "Course"],
-        "New Title": new_title,
-        "Old Attributes": courses_df.at[idx, "Attribute(s)"],
-        "New Attributes": new_attrs,
-        "Comment": comment,
-        "Submitted By": "Admin",
-        "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "Sent to ASO": False
-    }
+                log_entry = {
+                    "Course": selected,
+                    "Old Title": courses_df.at[idx, "Course"],
+                    "New Title": new_title,
+                    "Old Attributes": courses_df.at[idx, "Attribute(s)"],
+                    "New Attributes": new_attrs,
+                    "Comment": comment,
+                    "Submitted By": "Admin",
+                    "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "Sent to ASO": False
+                }
 
-    courses_df.at[idx, "Course"] = new_title
-    courses_df.at[idx, "Attribute(s)"] = new_attrs
-    change_log_df = pd.concat([change_log_df, pd.DataFrame([log_entry])], ignore_index=True)
+                courses_df.at[idx, "Course"] = new_title
+                courses_df.at[idx, "Attribute(s)"] = new_attrs
+                change_log_df = pd.concat([change_log_df, pd.DataFrame([log_entry])], ignore_index=True)
 
-    # Ensure Sent to ASO stays False by default
-    change_log_df["Sent to ASO"] = change_log_df["Sent to ASO"].astype(bool)
-    change_log_df.fillna({"Sent to ASO": False}, inplace=True)
+                change_log_df["Sent to ASO"] = change_log_df["Sent to ASO"].astype(bool)
+                change_log_df.fillna({"Sent to ASO": False}, inplace=True)
 
-    courses_ws.update([courses_df.columns.values.tolist()] + courses_df.values.tolist())
-    change_log_ws.update([change_log_df.columns.values.tolist()] + change_log_df.astype(str).values.tolist())
-    st.success("Edit submitted and logged.")
+                courses_ws.update([courses_df.columns.values.tolist()] + courses_df.values.tolist())
+                change_log_ws.update([change_log_df.columns.values.tolist()] + change_log_df.astype(str).values.tolist())
+                st.success("Edit submitted and logged.")
 
     st.subheader("Advisor: Submit an Attribute Inquiry")
     with st.form("advisor_form"):
@@ -105,21 +104,19 @@ with tab1:
         advisor_comment = st.text_area("Your question or comment")
         submitted_inquiry = st.form_submit_button("Submit Inquiry")
         if submitted_inquiry:
-    log_entry = {
-        "Name": advisor_name,
-        "Comment": advisor_comment,
-        "Addressed?": False
-    }
-    inquiry_log_df = pd.concat([inquiry_log_df, pd.DataFrame([log_entry])], ignore_index=True)
+            log_entry = {
+                "Name": advisor_name,
+                "Comment": advisor_comment,
+                "Addressed?": False,
+                "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+            inquiry_log_df = pd.concat([inquiry_log_df, pd.DataFrame([log_entry])], ignore_index=True)
 
-    # Ensure Addressed? stays explicitly False unless edited
-    inquiry_log_df["Addressed?"] = inquiry_log_df["Addressed?"].astype(bool)
-    inquiry_log_df.fillna({"Addressed?": False}, inplace=True)
+            inquiry_log_df["Addressed?"] = inquiry_log_df["Addressed?"].astype(bool)
+            inquiry_log_df.fillna({"Addressed?": False}, inplace=True)
 
-    # Update the Google Sheet
-    inquiry_log_ws.update([inquiry_log_df.columns.tolist()] + inquiry_log_df.astype(str).values.tolist())
-
-    st.success("Inquiry submitted.")
+            inquiry_log_ws.update([inquiry_log_df.columns.tolist()] + inquiry_log_df.astype(str).values.tolist())
+            st.success("Inquiry submitted.")
 
 # --- TAB 2: CHANGE LOG ---
 with tab2:
@@ -163,7 +160,6 @@ with tab3:
         )
 
         if is_admin and st.button("Save Inquiry Log"):
-            # Merge updates back into the main inquiry_log_df
             for idx, row in edited_df.iterrows():
                 original_idx = inquiry_log_df[inquiry_log_df["Timestamp"] == row["Timestamp"]].index
                 if not original_idx.empty:
@@ -174,3 +170,4 @@ with tab3:
             st.success("Inquiry log saved.")
     else:
         st.info("No inquiries submitted yet.")
+
