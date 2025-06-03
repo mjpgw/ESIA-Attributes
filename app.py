@@ -69,16 +69,20 @@ tab1, tab2, tab3 = st.tabs(["📄 Course Table", "📝 Change Log", "❓ Inquiry
 # --- TAB 1: COURSE TABLE ---
 with tab1:
     st.header("Course List")
-    df = st.session_state.courses_df.copy()
+    editable_courses_df = st.session_state.courses_df.copy()
     if is_admin:
-        df["Comment"] = df.get("Comment", "")
-        df = st.data_editor(df, use_container_width=True, num_rows="dynamic", disabled=[col for col in df.columns if col != "Comment"])
+        editable_courses_df["Comment"] = editable_courses_df.get("Comment", "")
+        editable_courses_df = st.data_editor(
+            editable_courses_df,
+            use_container_width=True,
+            num_rows="dynamic"
+        )
         if st.button("Save Course Comments"):
-            st.session_state.courses_df = df
-            courses_ws.update([df.columns.tolist()] + df.values.tolist())
-            st.success("Comments updated.")
+            st.session_state.courses_df = editable_courses_df
+            courses_ws.update([editable_courses_df.columns.tolist()] + editable_courses_df.values.tolist())
+            st.success("Courses updated.")
     else:
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(editable_courses_df, use_container_width=True)
 
     st.markdown("---")
     if is_admin:
@@ -108,6 +112,8 @@ with tab1:
                 st.session_state.courses_df.at[idx, "Course"] = new_title
                 st.session_state.courses_df.at[idx, "Attribute(s)"] = new_attrs
                 st.session_state.change_log_df = pd.concat([st.session_state.change_log_df, pd.DataFrame([log_entry])], ignore_index=True)
+                courses_ws.update([st.session_state.courses_df.columns.tolist()] + st.session_state.courses_df.values.tolist())
+                change_log_ws.update([st.session_state.change_log_df.columns.tolist()] + st.session_state.change_log_df.astype(str).values.tolist())
                 st.success("Edit submitted and logged.")
 
     st.subheader("Advisor: Submit an Attribute Inquiry")
@@ -134,17 +140,10 @@ with tab2:
 # --- TAB 3: INQUIRY LOG ---
 with tab3:
     st.header("Inquiry Log")
-    df = st.session_state.inquiry_log_df.copy()
     filter_unaddressed = st.checkbox("Show only unaddressed inquiries")
+    df = st.session_state.inquiry_log_df.copy()
     if filter_unaddressed:
         df = df[df["Addressed?"] == False]
-    if is_admin:
-        for i in df.index:
-            df.at[i, "Addressed?"] = st.checkbox("Addressed?", value=df.at[i, "Addressed?"], key=f"inq_{i}")
-        if st.button("Save Inquiry Log"):
-            for i in df.index:
-                st.session_state.inquiry_log_df.at[i, "Addressed?"] = df.at[i, "Addressed?"]
-            inquiry_log_ws.update([st.session_state.inquiry_log_df.columns.tolist()] + st.session_state.inquiry_log_df.astype(str).values.tolist())
-            st.success("Inquiry log saved.")
     st.dataframe(df, use_container_width=True)
+
 
