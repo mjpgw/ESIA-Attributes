@@ -7,7 +7,7 @@ from google.oauth2.service_account import Credentials
 st.set_page_config(page_title="Course Attribute Tracker", layout="wide")
 
 # --- USER PERMISSION SETUP ---
-AUTHORIZED_USERS = {"Esia1957"}  # Add more passwords here if needed
+AUTHORIZED_USERS = {"Esia1957"}
 is_admin = False
 
 # --- PASSWORD PROTECTION ---
@@ -31,8 +31,8 @@ courses_ws = sheet.worksheet("Courses")
 change_log_ws = sheet.worksheet("Log")
 inquiry_log_ws = sheet.worksheet("Inquiries")
 
-# --- LOAD DATA FUNCTIONS ---
-@st.cache_data
+# --- DATA CACHING ---
+@st.cache_data(ttl=60)
 def load_courses():
     df = pd.DataFrame(courses_ws.get_all_records())
     df.columns = df.columns.str.strip()
@@ -43,26 +43,30 @@ def load_log(ws):
     df.columns = [str(col).strip() for col in df.columns]
     return df
 
-courses_df = load_courses()
-change_log_df = load_log(change_log_ws) if change_log_ws.get_all_values() else pd.DataFrame(columns=[
-    "Course", "Old Title", "New Title", "Old Attributes", "New Attributes",
-    "Comment", "Submitted By", "Timestamp", "Sent to ASO"
-])
-inquiry_log_df = load_log(inquiry_log_ws) if inquiry_log_ws.get_all_values() else pd.DataFrame(columns=[
-    "Name", "Comment", "Addressed?", "Timestamp"
-])
+if "courses_df" not in st.session_state:
+    st.session_state.courses_df = load_courses()
 
-# Ensure checkbox columns are properly typed and defaulted to False
-if "Sent to ASO" in change_log_df.columns:
-    change_log_df["Sent to ASO"] = change_log_df["Sent to ASO"].astype(bool).fillna(False)
-if "Addressed?" in inquiry_log_df.columns:
-    inquiry_log_df["Addressed?"] = inquiry_log_df["Addressed?"].astype(bool).fillna(False)
+if "change_log_df" not in st.session_state:
+    if change_log_ws.get_all_values():
+        st.session_state.change_log_df = load_log(change_log_ws)
+    else:
+        st.session_state.change_log_df = pd.DataFrame(columns=[
+            "Course", "Old Title", "New Title", "Old Attributes", "New Attributes",
+            "Comment", "Submitted By", "Timestamp", "Sent to ASO"
+        ])
 
-# --- SESSION STATE FOR CHECKBOXES ---
-if "edited_change_log" not in st.session_state:
-    st.session_state.edited_change_log = change_log_df.copy()
-if "edited_inquiry_log" not in st.session_state:
-    st.session_state.edited_inquiry_log = inquiry_log_df.copy()
+if "inquiry_log_df" not in st.session_state:
+    if inquiry_log_ws.get_all_values():
+        st.session_state.inquiry_log_df = load_log(inquiry_log_ws)
+    else:
+        st.session_state.inquiry_log_df = pd.DataFrame(columns=[
+            "Name", "Comment", "Addressed?", "Timestamp"
+        ])
+
+# --- SANITIZE CHECKBOX COLUMNS ---
+for df_key, col in [("change_log_df", "Sent to ASO"), ("inquiry_log_df", "Addressed?")]:
+    if col in st.session_state[df_key].columns:
+        st.session_state[df_key][col] = st.session_state[df_key][col].astype(bool).fillna(False)
 
 # --- TABS ---
 tab1, tab2, tab3 = st.tabs(["📄 Course Table", "📝 Change Log", "❓ Inquiry Log"])
@@ -70,14 +74,14 @@ tab1, tab2, tab3 = st.tabs(["📄 Course Table", "📝 Change Log", "❓ Inquiry
 # --- TAB 1: COURSE TABLE ---
 with tab1:
     st.header("Course List")
-    st.dataframe(courses_df, use_container_width=True)
+    st.dataframe(st.session_state.courses_df, use_container_width=True)
 
     st.markdown("---")
     if is_admin:
         st.subheader("Admin: Edit Course")
         with st.form("edit_form"):
-            selected = st.selectbox("Select Course to Edit", courses_df["Course"])
-            course_row = courses_df[courses_df["Course"] == selected].iloc[0]
+            selected = st.selectbox("Select Course to Edit", st.session_state.courses_df["Course"])
+            course_row = st.session_state.courses_df[st.session_state.courses_df["Course"] == selected].iloc[0]
 
             new_title = st.text_input("New Title", course_row["Course"])
             new_attrs = st.text_input("New Attributes", course_row["Attribute(s)"])
@@ -85,27 +89,21 @@ with tab1:
 
             submitted = st.form_submit_button("Submit Edit")
             if submitted:
-                idx = courses_df[courses_df["Course"] == selected].index[0]
-
+                idx = st.session_state.courses_df[st.session_state.courses_df["Course"] == selected].index[0]
                 log_entry = {
                     "Course": selected,
-                    "Old Title": courses_df.at[idx, "Course"],
+                    "Old Title": st.session_state.courses_df.at[idx, "Course"],
                     "New Title": new_title,
-                    "Old Attributes": courses_df.at[idx, "Attribute(s)"],
+                    "Old Attributes": st.session_state.courses_df.at[idx, "Attribute(s)"],
                     "New Attributes": new_attrs,
                     "Comment": comment,
                     "Submitted By": "Admin",
                     "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "Sent to ASO": False
                 }
-
-                courses_df.at[idx, "Course"] = new_title
-                courses_df.at[idx, "Attribute(s)"] = new_attrs
-                change_log_df = pd.concat([change_log_df, pd.DataFrame([log_entry])], ignore_index=True)
-                st.session_state.edited_change_log = change_log_df.copy()
-
-                change_log_ws.update([change_log_df.columns.values.tolist()] + change_log_df.astype(str).values.tolist())
-                courses_ws.update([courses_df.columns.values.tolist()] + courses_df.values.tolist())
+                st.session_state.courses_df.at[idx, "Course"] = new_title
+                st.session_state.courses_df.at[idx, "Attribute(s)"] = new_attrs
+                st.session_state.change_log_df = pd.concat([st.session_state.change_log_df, pd.DataFrame([log_entry])], ignore_index=True)
                 st.success("Edit submitted and logged.")
 
     st.subheader("Advisor: Submit an Attribute Inquiry")
@@ -120,60 +118,34 @@ with tab1:
                 "Addressed?": False,
                 "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
-            inquiry_log_df = pd.concat([inquiry_log_df, pd.DataFrame([log_entry])], ignore_index=True)
-            st.session_state.edited_inquiry_log = inquiry_log_df.copy()
-            inquiry_log_ws.update([inquiry_log_df.columns.tolist()] + inquiry_log_df.astype(str).values.tolist())
+            st.session_state.inquiry_log_df = pd.concat([st.session_state.inquiry_log_df, pd.DataFrame([log_entry])], ignore_index=True)
             st.success("Inquiry submitted.")
 
 # --- TAB 2: CHANGE LOG ---
 with tab2:
     st.header("Change Log")
-    if not st.session_state.edited_change_log.empty:
-        editable_df = st.session_state.edited_change_log.copy()
-        editable_df["Comment"] = editable_df["Comment"].astype(str)
-        editable_df["Sent to ASO"] = editable_df["Sent to ASO"].astype(bool)
-
-        edited_df = st.data_editor(
-            editable_df,
-            use_container_width=True,
-            num_rows="dynamic",
-            disabled=([] if is_admin else list(editable_df.columns))
-        )
-
-        if is_admin and st.button("Save Change Log"):
-            st.session_state.edited_change_log = edited_df.copy()
-            change_log_ws.update([edited_df.columns.values.tolist()] + edited_df.astype(str).values.tolist())
-            st.success("Change log saved.")
-    else:
-        st.info("No change logs recorded yet.")
+    df = st.session_state.change_log_df.copy()
+    for i in df.index:
+        df.at[i, "Sent to ASO"] = st.checkbox("Sent to ASO", value=df.at[i, "Sent to ASO"], key=f"aso_{i}")
+    if is_admin and st.button("Save Change Log"):
+        for i in df.index:
+            st.session_state.change_log_df.at[i, "Sent to ASO"] = st.session_state.get(f"aso_{i}", False)
+        change_log_ws.update([st.session_state.change_log_df.columns.tolist()] + st.session_state.change_log_df.astype(str).values.tolist())
+        courses_ws.update([st.session_state.courses_df.columns.tolist()] + st.session_state.courses_df.values.tolist())
+        st.success("Change log saved.")
 
 # --- TAB 3: INQUIRY LOG ---
 with tab3:
     st.header("Inquiry Log")
     filter_unaddressed = st.checkbox("Show only unaddressed inquiries")
-    filtered_df = st.session_state.edited_inquiry_log[~st.session_state.edited_inquiry_log["Addressed?"]] if filter_unaddressed else st.session_state.edited_inquiry_log
-
-    if not filtered_df.empty:
-        editable_df = filtered_df.copy()
-        editable_df["Comment"] = editable_df["Comment"].astype(str)
-        editable_df["Addressed?"] = editable_df["Addressed?"].astype(bool)
-
-        edited_df = st.data_editor(
-            editable_df,
-            use_container_width=True,
-            num_rows="dynamic",
-            disabled=([] if is_admin else list(editable_df.columns))
-        )
-
-        if is_admin and st.button("Save Inquiry Log"):
-            # Merge changes by Timestamp
-            for idx, row in edited_df.iterrows():
-                original_idx = st.session_state.edited_inquiry_log[st.session_state.edited_inquiry_log["Timestamp"] == row["Timestamp"].strip()].index
-                if not original_idx.empty:
-                    st.session_state.edited_inquiry_log.loc[original_idx[0], "Addressed?"] = row["Addressed?"]
-                    st.session_state.edited_inquiry_log.loc[original_idx[0], "Comment"] = row["Comment"]
-            inquiry_log_ws.update([st.session_state.edited_inquiry_log.columns.values.tolist()] + st.session_state.edited_inquiry_log.astype(str).values.tolist())
-            st.success("Inquiry log saved.")
-    else:
-        st.info("No inquiries submitted yet.")
+    df = st.session_state.inquiry_log_df.copy()
+    if filter_unaddressed:
+        df = df[df["Addressed?"] == False]
+    for i in df.index:
+        df.at[i, "Addressed?"] = st.checkbox("Addressed?", value=df.at[i, "Addressed?"], key=f"inq_{i}")
+    if is_admin and st.button("Save Inquiry Log"):
+        for i in df.index:
+            st.session_state.inquiry_log_df.at[i, "Addressed?"] = st.session_state.get(f"inq_{i}", False)
+        inquiry_log_ws.update([st.session_state.inquiry_log_df.columns.tolist()] + st.session_state.inquiry_log_df.astype(str).values.tolist())
+        st.success("Inquiry log saved.")
 
