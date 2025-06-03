@@ -63,8 +63,11 @@ if "inquiry_log_df" not in st.session_state:
             "Name", "Comment", "Action", "Timestamp"
         ])
 
+# --- LOAD ATTRIBUTE GUIDE ---
+attribute_guide_df = pd.read_csv("Attribute Guide - Sheet1.csv")
+
 # --- TABS ---
-tab1, tab2, tab3 = st.tabs(["📄 Course Table", "📝 Change Log", "❓ Inquiry Log"])
+tab1, tab2, tab3, tab4 = st.tabs(["📄 Course Table", "📝 Change Log", "❓ Inquiry Log", "📘 Attribute Guide"])
 
 # --- TAB 1: COURSE TABLE ---
 with tab1:
@@ -167,4 +170,9 @@ with tab3:
         )
         inquiry_log_ws.update([st.session_state.inquiry_log_df.columns.tolist()] + st.session_state.inquiry_log_df.astype(str).values.tolist())
         st.success("Inquiry log saved.")
+
+# --- TAB 4: ATTRIBUTE GUIDE ---
+with tab4:
+    st.header("Attribute Guide")
+    st.dataframe(attribute_guide_df, use_container_width=True)
 
