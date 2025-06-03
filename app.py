@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
+from tenacity import retry, wait_fixed, stop_after_attempt
 
 st.set_page_config(page_title="Course Attribute Tracker", layout="wide")
 
@@ -42,6 +43,10 @@ def load_log(ws):
     df = pd.DataFrame(ws.get_all_records())
     df.columns = [str(col).strip() for col in df.columns]
     return df
+
+@retry(wait=wait_fixed(2), stop=stop_after_attempt(3))
+def safe_update(ws, data):
+    ws.update(data)
 
 courses_df = load_courses()
 change_log_df = load_log(change_log_ws) if change_log_ws.get_all_values() else pd.DataFrame(columns=[
@@ -97,8 +102,8 @@ with tab1:
                 courses_df.at[idx, "Attribute(s)"] = new_attrs
                 change_log_df = pd.concat([change_log_df, pd.DataFrame([log_entry])], ignore_index=True)
 
-                change_log_ws.update([change_log_df.columns.values.tolist()] + change_log_df.astype(str).values.tolist())
-                courses_ws.update([courses_df.columns.values.tolist()] + courses_df.values.tolist())
+                safe_update(change_log_ws, [change_log_df.columns.values.tolist()] + change_log_df.astype(str).values.tolist())
+                safe_update(courses_ws, [courses_df.columns.values.tolist()] + courses_df.values.tolist())
                 st.success("Edit submitted and logged.")
 
     st.subheader("Advisor: Submit an Attribute Inquiry")
@@ -114,7 +119,7 @@ with tab1:
                 "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
             inquiry_log_df = pd.concat([inquiry_log_df, pd.DataFrame([log_entry])], ignore_index=True)
-            inquiry_log_ws.update([inquiry_log_df.columns.tolist()] + inquiry_log_df.astype(str).values.tolist())
+            safe_update(inquiry_log_ws, [inquiry_log_df.columns.tolist()] + inquiry_log_df.astype(str).values.tolist())
             st.success("Inquiry submitted.")
 
 # --- TAB 2: CHANGE LOG ---
@@ -135,7 +140,7 @@ with tab2:
         if is_admin and st.button("Save Change Log"):
             if not change_log_df.equals(edited_df):
                 change_log_df = edited_df
-                change_log_ws.update([change_log_df.columns.values.tolist()] + change_log_df.astype(str).values.tolist())
+                safe_update(change_log_ws, [change_log_df.columns.values.tolist()] + change_log_df.astype(str).values.tolist())
                 st.success("Change log saved.")
     else:
         st.info("No change logs recorded yet.")
@@ -160,13 +165,12 @@ with tab3:
 
         if is_admin and st.button("Save Inquiry Log"):
             if not inquiry_log_df.equals(edited_df):
-                # Merge changes by Timestamp
                 for idx, row in edited_df.iterrows():
                     original_idx = inquiry_log_df[inquiry_log_df["Timestamp"] == row["Timestamp"]].index
                     if not original_idx.empty:
                         inquiry_log_df.loc[original_idx[0], "Addressed?"] = row["Addressed?"]
                         inquiry_log_df.loc[original_idx[0], "Comment"] = row["Comment"]
-                inquiry_log_ws.update([inquiry_log_df.columns.values.tolist()] + inquiry_log_df.astype(str).values.tolist())
+                safe_update(inquiry_log_ws, [inquiry_log_df.columns.values.tolist()] + inquiry_log_df.astype(str).values.tolist())
                 st.success("Inquiry log saved.")
     else:
         st.info("No inquiries submitted yet.")
