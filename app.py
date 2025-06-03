@@ -28,8 +28,8 @@ credentials = Credentials.from_service_account_info(
 client = gspread.authorize(credentials)
 sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1o8GFr4Wih4QM17KrMzQ2LYsMNmjR1EHtMn4Zvm_s3S8")
 courses_ws = sheet.worksheet("Courses")
-change_log_ws = sheet.worksheet("Change Log")
-inquiry_log_ws = sheet.worksheet("Inquiry Log")
+change_log_ws = sheet.worksheet("Log")
+inquiry_log_ws = sheet.worksheet("Inquiries")
 
 # --- LOAD DATA FUNCTIONS ---
 @st.cache_data
