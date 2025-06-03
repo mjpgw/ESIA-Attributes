@@ -51,7 +51,7 @@ if "change_log_df" not in st.session_state:
         st.session_state.change_log_df = load_log(change_log_ws)
     else:
         st.session_state.change_log_df = pd.DataFrame(columns=[
-            "Course", "Old Title", "New Title", "Old Attributes", "New Attributes",
+            "Course", "New Title", "Old Attributes", "New Attributes",
             "Comment", "Submitted By", "Timestamp", "Action"
         ])
 
@@ -101,7 +101,6 @@ with tab1:
                 idx = st.session_state.courses_df[st.session_state.courses_df["Course"] == selected].index[0]
                 log_entry = {
                     "Course": selected,
-                    "Old Title": st.session_state.courses_df.at[idx, "Course"],
                     "New Title": new_title,
                     "Old Attributes": st.session_state.courses_df.at[idx, "Attribute(s)"],
                     "New Attributes": new_attrs,
@@ -143,6 +142,7 @@ with tab2:
     if is_admin and st.button("Save Change Log"):
         st.session_state.change_log_df = edited_log
         change_log_ws.update([edited_log.columns.tolist()] + edited_log.astype(str).values.tolist())
+        courses_ws.update([st.session_state.courses_df.columns.tolist()] + st.session_state.courses_df.values.tolist())
         st.success("Change log saved.")
 
 # --- TAB 3: INQUIRY LOG ---
